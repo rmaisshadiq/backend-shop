@@ -1,6 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const PORT = 3000;
@@ -116,6 +117,166 @@ app.get('/products/heels', (req, res) => {
         res.status(200).json({
             message: "Berhasil ambil data produk",
             data: result
+        });
+    });
+});
+
+// ================= REGISTER =================
+app.post('/register', async (req, res) => {
+    // Ambil data dari body request (yang dikirim Flutter)
+    const { name, email, password, phone, address } = req.body;
+
+    // Validasi simpel
+    if (!name || !email || !password) {
+        return res.status(400).json({ message: "Nama, Email, dan Password wajib diisi!" });
+    }
+
+    try {
+        // 1. Cek dulu, email udah kepake belum?
+        const checkEmailSql = 'SELECT * FROM users WHERE email = ?';
+        db.query(checkEmailSql, [email], async (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            if (result.length > 0) {
+                return res.status(400).json({ message: "Email sudah terdaftar bro!" });
+            }
+
+            // 2. Kalau aman, Hash passwordnya
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // 3. Masukin ke Database
+            const insertSql = `INSERT INTO users (name, email, password, phone, address) VALUES (?, ?, ?, ?, ?)`;
+            
+            db.query(insertSql, [name, email, hashedPassword, phone, address], (err, result) => {
+                if (err) return res.status(500).json({ error: err.message });
+
+                res.status(201).json({
+                    message: "Registrasi Berhasil!",
+                    data: {
+                        id: result.insertId,
+                        name: name,
+                        email: email
+                    }
+                });
+            });
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: "Server Error" });
+    }
+});
+
+// ================= LOGIN =================
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ message: "Email dan Password harus diisi!" });
+    }
+
+    const sql = 'SELECT * FROM users WHERE email = ?';
+    db.query(sql, [email], async (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        if (result.length === 0) {
+            return res.status(404).json({ message: "User tidak ditemukan" });
+        }
+
+        const user = result[0];
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            return res.status(401).json({ message: "Password salah!" });
+        }
+        res.status(200).json({
+            message: "Login Berhasil",
+            data: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                address: user.address
+            }
+        });
+    });
+});
+
+// ================= REGISTER =================
+app.post('/register', async (req, res) => {
+    const { name, email, password, phone, address } = req.body;
+
+    // Validasi simpel
+    if (!name || !email || !password) {
+        return res.status(400).json({ message: "Nama, Email, dan Password wajib diisi!" });
+    }
+
+    try {
+        const checkEmailSql = 'SELECT * FROM users WHERE email = ?';
+        db.query(checkEmailSql, [email], async (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            if (result.length > 0) {
+                return res.status(400).json({ message: "Email sudah terdaftar." });
+            }
+
+            // 2. Kalau aman, Hash passwordnya
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // 3. Masukin ke Database
+            const insertSql = `INSERT INTO users (name, email, password, phone, address) VALUES (?, ?, ?, ?, ?)`;
+            
+            db.query(insertSql, [name, email, hashedPassword, phone, address], (err, result) => {
+                if (err) return res.status(500).json({ error: err.message });
+
+                res.status(201).json({
+                    message: "Registrasi Berhasil!",
+                    data: {
+                        id: result.insertId,
+                        name: name,
+                        email: email
+                    }
+                });
+            });
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: "Server Error" });
+    }
+});
+
+// ================= LOGIN =================
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ message: "Email dan Password harus diisi!" });
+    }
+
+    const sql = 'SELECT * FROM users WHERE email = ?';
+    db.query(sql, [email], async (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (result.length === 0) {
+            return res.status(404).json({ message: "User tidak ditemukan" });
+        }
+
+        const user = result[0];
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            return res.status(401).json({ message: "Password salah!" });
+        }
+
+        res.status(200).json({
+            message: "Login Berhasil",
+            data: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                address: user.address
+            }
         });
     });
 });
